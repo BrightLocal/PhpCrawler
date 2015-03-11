@@ -1,0 +1,9 @@
+{
+	"name": "brightlocal/php-crawler",
+	"description": "php crawler library",
+	"homepage": "https://github.com/BrightLocal/PhpCrawler",
+	"version": "0.8.1",
+	"autoload": {
+		"classmap": ["libs/"]
+	}
+}
