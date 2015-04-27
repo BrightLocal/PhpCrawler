@@ -131,6 +131,11 @@ class PHPCrawlerHTTPRequest
    */
   protected $socket;
 
+  /**
+   * @var string
+   */
+  protected $contentEncoding;
+
   protected $header_check_callback_function = null;
 
     /**
@@ -588,6 +593,7 @@ class PHPCrawlerHTTPRequest
       {
         $error_code = PHPCrawlerRequestErrors::ERROR_SOCKET_TIMEOUT;
         $error_string = "Socket-stream timed out (timeout set to ".$this->socketReadTimeout." sec).";
+        $this->contentEncoding = PHPCrawlerUtils::getContentEncodingFromHeader($header);
         return $header;
       }
 
@@ -608,6 +614,7 @@ class PHPCrawlerHTTPRequest
 
         PHPCrawlerBenchmark::stop("retreiving_header");
         PHPCrawlerBenchmark::stop("data_transfer_time");
+        $this->contentEncoding = PHPCrawlerUtils::getContentEncodingFromHeader($header);
         return $header;
       }
     }
@@ -659,6 +666,11 @@ class PHPCrawlerHTTPRequest
     $document_received_completely = true;
     $stop_receving = false;
 
+    if($this->contentEncoding === 'gzip') {
+        $this->readResponseContentToFile($this->tmpFile, $error_code, $error_string, $document_received_completely, $bytes_received);
+        $source_complete = $this->parseContentGzippedFile($this->tmpFile, $bytes_received);
+        goto parsingComplete;
+    }
     while ($stop_receving == false)
     {
       socket_set_timeout($this->socket, $this->socketReadTimeout);
@@ -724,9 +736,11 @@ class PHPCrawlerHTTPRequest
           PHPCrawlerBenchmark::start("retreiving_content");
           PHPCrawlerBenchmark::start("data_transfer_time", true);
         }
+        $this->processSourcePortion($source_portion);
       }
-
     }
+
+    parsingComplete:
 
     if ($stream_to_file == true) @fclose($fp);
 
@@ -738,6 +752,89 @@ class PHPCrawlerHTTPRequest
 
     return $source_complete;
   }
+
+
+    /**
+     * @param resource $tmpfile
+     * @param int $bytes_received
+     */
+    private function parseContentGzippedFile($tmpfile, &$bytes_received)
+    {
+        $source_portion = "";
+        $fp = gzopen($tmpfile, "r");
+
+        $checkIsNeedToBeProceeded = function ($line_read, &$source_portion) {
+            if (strlen($source_portion) >= 100000 || $line_read === false)
+            {
+                $this->processSourcePortion($source_portion);
+            }
+        };
+
+        while (($line_read = fgets($fp, 4096)) !== false)
+        {
+            $source_complete = $source_portion .= $line_read;
+            $bytes_received += strlen($line_read);
+            $this->global_traffic_count += strlen($line_read);
+            $checkIsNeedToBeProceeded($line_read, $source_portion);
+        }
+        $checkIsNeedToBeProceeded($line_read, $source_portion);
+        gzclose($fp);
+        return $source_complete;
+    }
+
+    /**
+     * @param stream $fp
+     * @param string $error_code
+     * @param string $error_string
+     * @param bool $document_received_completely
+     * @param int $bytes_received
+     */
+    private function readResponseContentToFile($tmpFile, &$error_code, &$error_string, &$document_received_completely, &$bytes_received)
+    {
+        $stop_receiving = false;
+        $fp = fopen($tmpFile, "w");
+        $content_chunk = "";
+        while ($stop_receiving == false)
+        {
+            socket_set_timeout($this->socket, $this->socketReadTimeout);
+
+            // Read from socket
+            $line_read = @fread($this->socket, 1024);
+            $status = socket_get_status($this->socket);
+
+            if ($status["eof"] == true) $stop_receiving = true;
+
+            if ($status["timed_out"] == true)
+            {
+                $stop_receiving = true;
+                $error_code = PHPCrawlerRequestErrors::ERROR_SOCKET_TIMEOUT;
+                $error_string = "Socket-stream timed out (timeout set to ".$this->socketReadTimeout." sec).";
+                $document_received_completely = false;
+            }
+            else
+            {
+                @fwrite($fp, $line_read);
+            }
+        }
+    }
+
+    /**
+     * @param string $source_portion
+     */
+    private function processSourcePortion(&$source_portion)
+    {
+        if (PHPCrawlerUtils::checkStringAgainstRegexArray($this->lastResponseHeader->content_type, $this->linksearch_content_types))
+        {
+            PHPCrawlerBenchmark::stop("retreiving_content");
+            PHPCrawlerBenchmark::stop("data_transfer_time");
+
+            $this->LinkFinder->findLinksInHTMLChunk($source_portion);
+            $source_portion = substr($source_portion, -1500);
+
+            PHPCrawlerBenchmark::start("retreiving_content");
+            PHPCrawlerBenchmark::start("data_transfer_time", true);
+        }
+    }
 
   /**
    * Builds the request-header from the given settings.
