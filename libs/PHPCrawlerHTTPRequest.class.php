@@ -138,6 +138,27 @@ class PHPCrawlerHTTPRequest
 
   protected $header_check_callback_function = null;
 
+    /**
+     * @var int
+     */
+    const FIRST_NON_BLOCKING_MODE_BYTES_COUNT = 10;
+    /**
+     * @var int
+     */
+    const REMAINS_NON_BLOCKING_MODE_BYTES_COUNT = 1014;
+    /**
+     * @var int
+     */
+    const TIMEOUT_BETWEEN_NON_BLOCKING_READING_ATTEMPTS = 1;
+    /**
+     * @var int
+     */
+    const READING_BYTES_COUNT = 1024;
+    /**
+     * @var int
+     */
+    const MAX_ATTEMPTS_READING_COUNT_NON_BLOCKING_MODE = 4;
+
   public function __construct()
   {
     // Init LinkFinder
@@ -523,13 +544,37 @@ class PHPCrawlerHTTPRequest
     $header = "";
     $server_responded = false;
 
+      //let's try to bite server one time
+      socket_set_blocking($this->socket, 0);
+      $attempts = 0;
+      $line_read = false;
+      while ($attempts < self::MAX_ATTEMPTS_READING_COUNT_NON_BLOCKING_MODE && $line_read === false && $server_responded === false) {
+          $line_read = fgets($this->socket, self::FIRST_NON_BLOCKING_MODE_BYTES_COUNT);
+          if(!$line_read){
+              sleep(self::TIMEOUT_BETWEEN_NON_BLOCKING_READING_ATTEMPTS);
+          }
+          $attempts++;
+      }
+
+      if ($line_read === false) {
+          $error_code = PHPCrawlerRequestErrors::ERROR_HOST_UNREACHABLE;
+          $error_string = "Socket-stream cannot be read.";
+          return $header;
+      }
+
     while ($status["eof"] == false)
     {
       socket_set_timeout($this->socket, $this->socketReadTimeout);
 
-      // Read from socket
-      $line_read = fgets($this->socket, 1024); // Das @ ist da um die bl�de "SSL fatal protocol error"-Warnung zu unterdr�cken,
-                                               // die keinen Sinn macht
+        // if we already got a first piece of content in non-blocked mode we would get remains of one in blocked mode
+        if ($server_responded === false && $line_read !== false) {
+            socket_set_blocking($this->socket, 1);
+            $line_read .= fgets($this->socket, self::REMAINS_NON_BLOCKING_MODE_BYTES_COUNT);
+        } else {
+            $line_read = fgets($this->socket, self::READING_BYTES_COUNT); // Das @ ist da um die bl�de "SSL fatal protocol error"-Warnung zu unterdr�cken,
+            // die keinen Sinn macht
+        }
+
       if ($server_responded == false)
       {
         $server_responded = true;
@@ -573,6 +618,7 @@ class PHPCrawlerHTTPRequest
         return $header;
       }
     }
+      no_header_found:
 
     // No header found
     if ($header == "")
@@ -695,6 +741,7 @@ class PHPCrawlerHTTPRequest
     }
 
     parsingComplete:
+
     if ($stream_to_file == true) @fclose($fp);
 
     PHPCrawlerBenchmark::stop("retreiving_content");
