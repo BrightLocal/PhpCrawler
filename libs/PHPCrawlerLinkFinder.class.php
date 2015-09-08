@@ -205,7 +205,7 @@ class PHPCrawlerLinkFinder
       $pregs[]="/[\s\.:;](?:".$tag_regex_part.")\s*=\s*([\"|'])(.{0,500}?)\\1/ is";
       
       // Everything like "...href=bla.html..." without qoutes
-      $pregs[]="/[\s\.:;](?:".$tag_regex_part.")\s*(=)\s*([^\s\">']{1,500})/ is";
+      //$pregs[]="/[\s\.:;](?:".$tag_regex_part.")\s*(=)\s*([^\s\">']{1,500})/ is";
       
       for ($x=0; $x<count($pregs); $x++)
       {
