@@ -62,6 +62,11 @@ class PHPCrawlerLinkFinder
    * @var array
    */
   protected $meta_attributes = array();
+
+  /**
+   * @var array
+   */
+  protected $skip_links = array('\\', '#');
   
   public function __construct()
   {
@@ -232,6 +237,8 @@ class PHPCrawlerLinkFinder
   protected function addLinkToCache($link_raw, $link_code, $link_text = "")
   {
     //PHPCrawlerBenchmark::start("preparing_link_for_cache");
+
+    if (in_array($link_raw, $this->skip_links, true)) return;
     
     // If liks already was found and processed -> skip this link
     if (isset($this->found_links_map[$link_raw])) return;
