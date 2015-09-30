@@ -484,7 +484,7 @@ class PHPCrawlerHTTPRequest
       else
         $context = stream_context_create(array());
 
-      $this->socket = @stream_socket_client($protocol_prefix.$ip_address.":".$this->url_parts["port"], $error_code, $error_str,
+      $this->socket = @stream_socket_client($protocol_prefix.$this->url_parts["host"].":".$this->url_parts["port"], $error_code, $error_str,
                                            $this->socketConnectTimeout, STREAM_CLIENT_CONNECT, $context);
     }
 
