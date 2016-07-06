@@ -227,7 +227,7 @@ class PHPCrawlerUtils
    */
   public static function buildURLFromLink($link, PHPCrawlerUrlPartsDescriptor $BaseUrlParts)
   {
-
+    $link = html_entity_decode($link);
     $url_parts = $BaseUrlParts->toArray();
 
     // Entities-replacements
