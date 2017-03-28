@@ -1100,6 +1100,15 @@ class PHPCrawler
   }
 
   /**
+   * Skips certificate verifying
+   *
+   * @param bool $skip
+   */
+  public function skipCertVerifying($skip) {
+    $this->PageRequest->skipCertCheck($skip);
+  }
+
+  /**
    * Defines whether the crawler should follow HTTP-redirects until first content was found, regardless of defined filter-rules and follow-modes.
    *
    * Sometimes, when requesting an URL, the first thing the webserver does is sending a redirect to

@@ -136,6 +136,11 @@ class PHPCrawlerHTTPRequest
    */
   protected $contentEncoding;
 
+  /**
+   * @var bool
+   */
+  protected $skipCertCheck = false;
+
   protected $header_check_callback_function = null;
 
     /**
@@ -293,6 +298,15 @@ class PHPCrawlerHTTPRequest
   {
     $this->url_parts["auth_username"] = $username;
     $this->url_parts["auth_password"] = $password;
+  }
+
+  /**
+   * Skips certificate verifying
+   *
+   * @param bool $skip
+   */
+  public function skipCertCheck($skip) {
+    $this->skipCertCheck = $skip;
   }
 
   /**
@@ -479,11 +493,16 @@ class PHPCrawlerHTTPRequest
       //$this->socket = @fsockopen ($protocol_prefix.$ip_address, $this->url_parts["port"], $error_code, $error_str, $this->socketConnectTimeout);
 
       // If ssl -> perform Server name indication
-      if ($this->url_parts["protocol"] == "https://")
-        $context = stream_context_create(array('ssl' => array('SNI_server_name' => $this->url_parts["host"])));
-      else
+      if ($this->url_parts["protocol"] == "https://") {
+        $params = array('SNI_server_name' => $this->url_parts["host"]);
+        if ($this->skipCertCheck) {
+          $params['verify_peer'] = false;
+          $params['verify_peer_name'] = false;
+        }
+        $context = stream_context_create(array('ssl' => $params));
+      } else {
         $context = stream_context_create(array());
-
+      }
       $this->socket = @stream_socket_client($protocol_prefix.$this->url_parts["host"].":".$this->url_parts["port"], $error_code, $error_str,
                                            $this->socketConnectTimeout, STREAM_CLIENT_CONNECT, $context);
     }
