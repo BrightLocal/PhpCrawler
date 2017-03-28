@@ -1101,11 +1101,16 @@ class PHPCrawler
 
   /**
    * Skips certificate verifying
-   *
-   * @param bool $skip
    */
-  public function skipCertVerifying($skip) {
-    $this->PageRequest->skipCertCheck($skip);
+  public function skipCertVerifying() {
+    $this->PageRequest->skipCertCheck(true);
+  }
+
+  /**
+   * Enable certificate verifying
+   */
+  public function enableCertVerifying(){
+    $this->PageRequest->skipCertCheck(false);
   }
 
   /**
